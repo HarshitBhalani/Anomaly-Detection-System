@@ -31,11 +31,11 @@ def video_frame_callback(frame):
     return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 # Streamlit UI setup
-st.title("Anomaly Detection System")
-st.markdown("## Live Camera Feed for Anomaly Detection")
+st.title(" Anomaly Detection System")
+st.markdown("##  Live Camera Feed  for Anomaly Detection")
 
 # Option to upload an image
-uploaded_file = st.file_uploader("Upload an image for anomaly detection", type=["jpg", "png", "jpeg"])
+uploaded_file = st.file_uploader("Upload  an image for anomaly detection", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
