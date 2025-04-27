@@ -2,98 +2,65 @@ import streamlit as st
 import tensorflow as tf
 import numpy as np
 import cv2
+from streamlit_webrtc import webrtc_streamer
+import av
 from PIL import Image
 
-# Title and description
-st.set_page_config(page_title="Anomaly Detection System", layout="wide")
-st.title('🔍 Anomaly Detection System for plate')
+# Load your model and labels
+model = tf.keras.models.load_model('keras_model.h5')
+with open('labels.txt', 'r') as f:
+    labels = f.read().splitlines()
 
-st.write("""
-This system can detect whether a plate is **Normal** or **Defective** 
-based on the uploaded image or live camera feed.
-""")
+# Function to process frames for live camera feed
+def video_frame_callback(frame):
+    img = frame.to_ndarray(format="bgr24")
 
-# Load the TFLite model
-@st.cache_resource
-def load_model():
-    interpreter = tf.lite.Interpreter(model_path="model_unquant.tflite")
-    interpreter.allocate_tensors()
-    return interpreter
+    # Resize the image to match the model input size
+    resized = cv2.resize(img, (224, 224))
+    normalized = resized / 255.0
+    reshaped = np.expand_dims(normalized, axis=0)
 
-interpreter = load_model()
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
+    # Model prediction
+    prediction = model.predict(reshaped)
+    predicted_class = labels[np.argmax(prediction)]
 
-# Class names
-classes = ['Normal', 'Defective']  # Same order as in Teachable Machine
+    # Draw predicted label on the image
+    cv2.putText(img, predicted_class, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 
+                1, (0, 255, 0), 2, cv2.LINE_AA)
 
-# Prediction function
-def predict_image(img):
-    img = img.resize((224, 224))    # Resize to match the model input
-    img = np.expand_dims(img, axis=0)
-    img = np.array(img, dtype=np.float32) / 255.0   # Normalize
-    interpreter.set_tensor(input_details[0]['index'], img)
-    interpreter.invoke()
-    output_data = interpreter.get_tensor(output_details[0]['index'])
-    prediction = np.squeeze(output_data)
-    return prediction
+    return av.VideoFrame.from_ndarray(img, format="bgr24")
 
-def predict_frame(frame):
-    frame = cv2.resize(frame, (224, 224))
-    frame = np.expand_dims(frame, axis=0)
-    frame = np.array(frame, dtype=np.float32) / 255.0
-    interpreter.set_tensor(input_details[0]['index'], frame)
-    interpreter.invoke()
-    output_data = interpreter.get_tensor(output_details[0]['index'])
-    prediction = np.squeeze(output_data)
-    return prediction
+# Streamlit UI setup
+st.title("Anomaly Detection System")
+st.markdown("## Live Camera Feed for Anomaly Detection")
 
-# Sidebar options
-option = st.sidebar.radio(
-    "Select Input Method:",
-    ('Upload an Image', 'Real-Time Camera Detection')
+# Option to upload an image
+uploaded_file = st.file_uploader("Upload an image for anomaly detection", type=["jpg", "png", "jpeg"])
+
+if uploaded_file is not None:
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_column_width=True)
+
+    # Preprocess the image for prediction
+    img_array = np.array(image)
+    resized = cv2.resize(img_array, (224, 224))
+    normalized = resized / 255.0
+    reshaped = np.expand_dims(normalized, axis=0)
+
+    # Predict using the model
+    prediction = model.predict(reshaped)
+    predicted_class = labels[np.argmax(prediction)]
+
+    st.write(f"Prediction: {predicted_class}")
+
+# Display live webcam stream if user chooses
+st.markdown("### Live Camera Stream")
+
+webrtc_streamer(
+    key="live-anomaly-detection",
+    video_frame_callback=video_frame_callback
 )
 
-# Image Upload Interface
-if option == 'Upload an Image':
-    uploaded_file = st.file_uploader("Upload an image of the Plate...", type=["jpg", "jpeg", "png"])
-
-    if uploaded_file is not None:
-        image = Image.open(uploaded_file)
-        st.image(image, caption='Uploaded Image', use_column_width=True)
-        
-        prediction = predict_image(image)
-        predicted_class = classes[np.argmax(prediction)]
-        confidence = np.max(prediction) * 100
-
-        st.markdown(f"### 🧠 Prediction: **{predicted_class}**")
-        st.markdown(f"### 🔥 Confidence: **{confidence:.2f}%**")
-
-# Real-Time Camera Detection
-elif option == 'Real-Time Camera Detection':
-    run = st.checkbox('Start Camera')
-    FRAME_WINDOW = st.image([])
-    
-    camera = cv2.VideoCapture(0)
-
-    while run:
-        ret, frame = camera.read()
-        if not ret:
-            st.error('Failed to access camera')
-            break
-
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        prediction = predict_frame(frame_rgb)
-        predicted_class = classes[np.argmax(prediction)]
-        confidence = np.max(prediction) * 100
-
-        # Put Prediction Text
-        annotated_frame = frame_rgb.copy()
-        cv2.putText(annotated_frame, f'{predicted_class} ({confidence:.2f}%)',
-                    (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
-
-        FRAME_WINDOW.image(annotated_frame)
-    
-    else:
-        st.write('Camera stopped.')
-
+# Option to show extra features or explanations
+st.sidebar.title("Options")
+st.sidebar.markdown("You can choose between **live camera feed** or **uploading an image**.")
