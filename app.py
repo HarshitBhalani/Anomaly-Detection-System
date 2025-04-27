@@ -51,10 +51,10 @@ if uploaded_file is not None:
     prediction = model.predict(reshaped)
     predicted_class = labels[np.argmax(prediction)]
 
-    st.write(f"Prediction: {predicted_class}")
+    st.write(f"Prediction : {predicted_class}")
 
 # Display live webcam stream if user chooses
-st.markdown("### Live Camera Stream")
+st.markdown("### Live Camera Stream  ")
 
 webrtc_streamer(
     key="live-anomaly-detection",
