@@ -16,7 +16,7 @@ based on the uploaded image or live camera feed.
 # Load the TFLite model
 @st.cache_resource
 def load_model():
-    interpreter = tf.lite.Interpreter(model_path="./model_unquant.tflite")
+    interpreter = tf.lite.Interpreter(model_path="model_unquant.tflite")
     interpreter.allocate_tensors()
     return interpreter
 
